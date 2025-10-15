@@ -9,7 +9,7 @@ from io import BytesIO
 
 st.set_page_config(page_title="Bodová kružnice", layout="wide")
 
-st.title("Bodová kružnice — generátor a vizualizace")
+st.title("⭕Bodová kružnice — generátor a vizualizace")
 
 # --- SIDEBAR: informace, autor ---
 with st.sidebar:
@@ -184,3 +184,4 @@ st.write(
     - Export do SVG nebo EPS pro vektorové zpracování.
     """
 )
+

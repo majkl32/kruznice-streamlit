@@ -5,6 +5,7 @@ from io import BytesIO
 from fpdf import FPDF
 import tempfile
 import os
+import requests
 
 # --- Nastavení stránky ---
 st.set_page_config(page_title="Kružnice – Body na kružnici", page_icon="⚪", layout="wide")
@@ -51,14 +52,25 @@ for i, (xi, yi) in enumerate(zip(x, y), 1):
 ax.legend()
 st.pyplot(fig)
 
-# --- Funkce pro vytvoření PDF ---
+# --- Funkce pro vytvoření PDF s automatickým fontem ---
 def create_pdf():
     buffer = BytesIO()
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", "B", 14)
+
+    # --- Stáhnout DejaVuSans.ttf pokud neexistuje ---
+    font_path = "DejaVuSans.ttf"
+    if not os.path.exists(font_path):
+        url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
+        r = requests.get(url)
+        with open(font_path, "wb") as f:
+            f.write(r.content)
+
+    # Přidání Unicode fontu
+    pdf.add_font("DejaVu", "", font_path, uni=True)
+    pdf.set_font("DejaVu", "B", 14)
     pdf.cell(0, 10, "Kružnice – parametry úlohy", ln=True)
-    pdf.set_font("Arial", size=11)
+    pdf.set_font("DejaVu", "", 11)
     pdf.cell(0, 8, f"Střed: ({cx}, {cy}) {jednotka}", ln=True)
     pdf.cell(0, 8, f"Poloměr: {r} {jednotka}", ln=True)
     pdf.cell(0, 8, f"Počet bodů: {n}", ln=True)
@@ -100,4 +112,3 @@ with st.expander("ℹ️ Informace o aplikaci"):
     - vykreslení kružnice s body  
     - export výsledku a parametrů do PDF  
     """)
-

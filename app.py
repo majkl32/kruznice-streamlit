@@ -1,115 +1,186 @@
+# app.py
+# -*- coding: utf-8 -*-
 import streamlit as st
-import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 from io import BytesIO
-from fpdf import FPDF
-import tempfile
-import os
-import requests
 
-# --- Nastavení stránky ---
-st.set_page_config(page_title="Kružnice – Body na kružnici", page_icon="⚪", layout="wide")
+st.set_page_config(page_title="Bodová kružnice", layout="wide")
 
-st.title("⚪ Body na kružnici – webová aplikace")
+st.title("Bodová kružnice — generátor a vizualizace")
 
-# --- Vstupní parametry ---
-st.sidebar.header("Parametry kružnice")
-cx = st.sidebar.number_input("Střed X", value=0.0)
-cy = st.sidebar.number_input("Střed Y", value=0.0)
-r = st.sidebar.number_input("Poloměr", value=5.0, min_value=0.0)
-n = st.sidebar.number_input("Počet bodů na kružnici", value=12, min_value=1, step=1)
-barva = st.sidebar.color_picker("Barva bodů", "#ff3b30")
-jednotka = st.sidebar.text_input("Jednotka (např. m)", "m")
+# --- SIDEBAR: informace, autor ---
+with st.sidebar:
+    st.header("O aplikaci")
+    st.write(
+        """
+        Tato aplikace generuje nebo vizualizuje body na kružnici.
+        Umožňuje zadat střed, poloměr, počet bodů a barvu bodů.
+        Součástí je export grafu a parametrů do PDF.
+        """
+    )
+    st.markdown("---")
+    st.header("Autor / Kontakt")
+    author_name = st.text_input("Tvé jméno (pro PDF)", value="Jméno Příjmení")
+    author_contact = st.text_input("Kontakt (email / telefon)", value="email@example.com")
+    st.markdown("Technologie: Python, Streamlit, NumPy, Pandas, Matplotlib.")
+    st.markdown("---")
+    st.info("Nahraj Excel s `x` a `y`, pokud chceš vizualizovat vlastní data.\nZačne se použivat nahraný soubor pokud je nahraný.")
 
-st.sidebar.header("Autor a kontakt")
-autor = st.sidebar.text_input("Tvé jméno", "Jan Novák")
-kontakt = st.sidebar.text_input("Kontakt (e-mail, web...)", "jan.novak@example.com")
+st.write("## Vstupní parametry")
 
-# --- Výpočet bodů ---
-uhly = np.linspace(0, 2 * np.pi, n, endpoint=False)
-x = cx + r * np.cos(uhly)
-y = cy + r * np.sin(uhly)
+col1, col2, col3 = st.columns([1,1,1])
 
-# --- Vykreslení ---
-fig, ax = plt.subplots(figsize=(6, 6))
-ax.set_aspect("equal", adjustable="box")
-ax.grid(True, which="both", linestyle="--", linewidth=0.5)
-ax.axhline(0, color="black", linewidth=1)
-ax.axvline(0, color="black", linewidth=1)
-ax.set_xlabel(f"X [{jednotka}]")
-ax.set_ylabel(f"Y [{jednotka}]")
+with col1:
+    use_uploaded = st.checkbox("Použít nahraný Excel (přepisovat generování)", value=False)
+    uploaded_file = st.file_uploader("Nahraj .xlsx nebo .csv (sloupce x,y)", type=["xlsx","csv"])
 
-# Kružnice a body
-ax.plot(cx, cy, "ko", label="Střed")
-ax.plot(x, y, "o", color=barva, label="Body na kružnici")
-circle = plt.Circle((cx, cy), r, fill=False, color="blue", linewidth=1.5)
-ax.add_artist(circle)
+with col2:
+    st.subheader("Parametry kružnice (pro generování)")
+    center_x = st.number_input("Střed x", value=0.0, format="%.4f")
+    center_y = st.number_input("Střed y", value=0.0, format="%.4f")
+    radius = st.number_input("Poloměr", min_value=0.0, value=1.0, format="%.4f")
+    units = st.text_input("Jednotka os (např. m)", value="m")
 
-# Popisky bodů
-for i, (xi, yi) in enumerate(zip(x, y), 1):
-    ax.text(xi, yi, f"{i}", fontsize=9, ha="left", va="bottom")
+with col3:
+    num_points = st.slider("Počet bodů na kružnici", min_value=3, max_value=5000, value=100)
+    color = st.color_picker("Barva bodů", value="#1f77b4")
+    show_grid = st.checkbox("Zobrazit mřížku", value=True)
+    show_coords = st.checkbox("Zobrazit tabulku souřadnic", value=True)
 
-ax.legend()
+# --- Load data either from upload or generate ---
+df = None
+error_msg = None
+if uploaded_file is not None:
+    try:
+        if uploaded_file.name.lower().endswith(".csv"):
+            df = pd.read_csv(uploaded_file)
+        else:
+            df = pd.read_excel(uploaded_file)
+        # Ensure x,y exist
+        if not {"x","y"}.issubset(df.columns):
+            # try lowercase/uppercase tolerance
+            cols = {c.lower(): c for c in df.columns}
+            if "x" in cols and "y" in cols:
+                df = df.rename(columns={cols["x"]:"x", cols["y"]:"y"})
+            else:
+                error_msg = "Soubor musí obsahovat sloupce 'x' a 'y' (citlivost na názvy sloupců aplikována)."
+                df = None
+        else:
+            df = df[["x","y"]].astype(float)
+        if df is not None:
+            st.success(f"Nahrán soubor: {uploaded_file.name} — {len(df)} bodů")
+    except Exception as e:
+        error_msg = f"Chyba při načítání souboru: {e}"
+        df = None
+
+# If user opted to use uploaded data, enforce that
+if use_uploaded and df is None:
+    st.warning("Vybral(a) jste použití nahraného souboru, ale žádný validní .xlsx/.csv s x,y byl nahrán.")
+elif (not use_uploaded) or (use_uploaded and df is None):
+    # generate circle
+    theta = np.linspace(0, 2*np.pi, num_points, endpoint=False)
+    x = center_x + radius * np.cos(theta)
+    y = center_y + radius * np.sin(theta)
+    df_generated = pd.DataFrame({"x": x, "y": y})
+    if df is None or not use_uploaded:
+        df = df_generated
+
+if error_msg:
+    st.error(error_msg)
+
+# --- Plot ---
+st.write("## Graf kružnice")
+fig, ax = plt.subplots(figsize=(6,6))
+ax.scatter(df["x"], df["y"], c=color, s=20)
+ax.set_aspect('equal', adjustable='box')
+ax.set_xlabel(f"X ({units})")
+ax.set_ylabel(f"Y ({units})")
+ax.set_title("Bodová kružnice (vizualizace)")
+if show_grid:
+    ax.grid(True, linestyle='--', linewidth=0.5)
+
+# adjust ticks to include unit in label (but keep numeric ticks)
+xticks = ax.get_xticks()
+yticks = ax.get_yticks()
+ax.set_xticklabels([f"{t:.2f}" for t in xticks])
+ax.set_yticklabels([f"{t:.2f}" for t in yticks])
+
 st.pyplot(fig)
 
-# --- Funkce pro vytvoření PDF s fpdf2 ---
-def create_pdf():
-    buffer = BytesIO()
-    pdf = FPDF()
-    pdf.add_page()
+# Show coordinates table and CSV download
+if show_coords:
+    st.write("### Tabulka souřadnic")
+    st.dataframe(df.reset_index(drop=True).rename(columns={"x":"x ("+units+")", "y":"y ("+units+")"}))
 
-    # --- Stáhnout DejaVuSans.ttf pokud neexistuje ---
-    font_path = "DejaVuSans.ttf"
-    if not os.path.exists(font_path):
-        url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
-        r = requests.get(url)
-        with open(font_path, "wb") as f:
-            f.write(r.content)
+    csv_bytes = df.to_csv(index=False).encode('utf-8')
+    st.download_button("Stáhnout souřadnice (CSV)", data=csv_bytes, file_name="kruznice_souradnice.csv", mime="text/csv")
 
-    # Přidání Unicode TrueType fontu
-    pdf.add_font("DejaVu", "", font_path, uni=True)
-    pdf.set_font("DejaVu", "B", 14)
-    pdf.cell(0, 10, "Kružnice – parametry úlohy", ln=True)
-    pdf.set_font("DejaVu", "", 11)
-    pdf.cell(0, 8, f"Střed: ({cx}, {cy}) {jednotka}", ln=True)
-    pdf.cell(0, 8, f"Poloměr: {r} {jednotka}", ln=True)
-    pdf.cell(0, 8, f"Počet bodů: {n}", ln=True)
-    pdf.cell(0, 8, f"Barva bodů: {barva}", ln=True)
-    pdf.cell(0, 8, f"Autor: {autor}", ln=True)
-    pdf.cell(0, 8, f"Kontakt: {kontakt}", ln=True)
+# --- PDF export ---
+st.write("---")
+st.write("## Export do PDF")
 
-    # --- Ulož graf do dočasného obrázku ---
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
-        fig.savefig(tmpfile.name, format="png", bbox_inches="tight")
-        tmpfile_path = tmpfile.name
+pdf_button_col1, pdf_button_col2 = st.columns([2,1])
+with pdf_button_col1:
+    pdf_note = st.text_area("Poznámka do PDF (volitelné)", value="")
 
-    # --- Vlož do PDF ---
-    pdf.image(tmpfile_path, x=10, y=80, w=180)
+with pdf_button_col2:
+    if st.button("Vytvořit a stáhnout PDF"):
+        # Create PDF in memory
+        buffer = BytesIO()
+        with PdfPages(buffer) as pdf:
+            # 1) Save plot page
+            fig_plot, ax_plot = plt.subplots(figsize=(8,8))
+            ax_plot.scatter(df["x"], df["y"], c=color, s=20)
+            ax_plot.set_aspect('equal', adjustable='box')
+            ax_plot.set_xlabel(f"X ({units})")
+            ax_plot.set_ylabel(f"Y ({units})")
+            ax_plot.set_title("Bodová kružnice")
+            if show_grid:
+                ax_plot.grid(True, linestyle='--', linewidth=0.5)
+            pdf.savefig(fig_plot, bbox_inches='tight')
+            plt.close(fig_plot)
 
-    # --- Smaž dočasný soubor ---
-    os.remove(tmpfile_path)
+            # 2) Save parameters page as a simple text figure
+            fig_text = plt.figure(figsize=(8,11))
+            plt.axis('off')
+            lines = [
+                "Parametry úlohy:",
+                f" - Střed: ({center_x:.4f}, {center_y:.4f}) {units}",
+                f" - Poloměr: {radius:.4f} {units}",
+                f" - Počet bodů: {num_points}",
+                f" - Barva bodů: {color}",
+                f" - Použit nahraný soubor: {'Ano' if (uploaded_file is not None and use_uploaded) else 'Ne'}",
+                "",
+                "Autor / kontakt:",
+                f" - Jméno: {author_name}",
+                f" - Kontakt: {author_contact}",
+                "",
+                "Poznámka:",
+                pdf_note
+            ]
+            # render text
+            y = 0.95
+            for ln in lines:
+                plt.text(0.05, y, ln, fontsize=12, transform=plt.gcf().transFigure)
+                y -= 0.05
+            pdf.savefig(fig_text, bbox_inches='tight')
+            plt.close(fig_text)
 
-    pdf.output(buffer)
-    buffer.seek(0)
-    return buffer
+        buffer.seek(0)
+        st.success("PDF připraveno ke stažení.")
+        st.download_button("Stáhnout PDF", data=buffer, file_name="kruznice_report.pdf", mime="application/pdf")
 
-# --- Tlačítko pro stažení PDF ---
-st.download_button(
-    label="📄 Stáhnout PDF",
-    data=create_pdf(),
-    file_name="kruznice.pdf",
-    mime="application/pdf",
+st.write("---")
+st.caption("Tip: pro tisk do fyzické tiskárny můžeš stáhnout PDF a použít tisk z prohlížeče nebo použít tisk přímo (Ctrl+P) z rozhraní Streamlit pro tuto stránku.")
+
+st.write("## Další možnosti / nápady")
+st.write(
+    """
+    - Přidat měření délky oblouku mezi dvěma body.\n
+    - Přidat označení indexů bodů přímo v grafu.\n
+    - Export do SVG nebo EPS pro vektorové zpracování.
+    """
 )
-
-# --- Info ---
-st.markdown("---")
-with st.expander("ℹ️ Informace o aplikaci"):
-    st.write("""
-    **Autor aplikace:** *zadej své jméno v levém panelu*  
-    **Asistent:** GPT-5  
-    **Použité technologie:** Streamlit, Matplotlib, NumPy, FPDF2  
-    **Funkce:**  
-    - zadání středu, poloměru, počtu bodů, barvy a jednotky  
-    - vykreslení kružnice s body  
-    - export výsledku a parametrů do PDF  
-    """)

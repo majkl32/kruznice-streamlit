@@ -8,7 +8,7 @@ import os
 import requests
 
 # --- Nastavení stránky ---
-st.set_page_config(page_title="Kružnice – Body na kružnici", page_icon="⚪", layout="wide")
+st.set_page_config(page_title="Kružnice – Body na kružnici", page_icon="⭕", layout="wide")
 
 st.title("⭕ Body na kružnici – webová aplikace")
 
@@ -114,4 +114,5 @@ st.write(
     - Export do SVG nebo EPS pro vektorové zpracování.
     """
 )
+
 

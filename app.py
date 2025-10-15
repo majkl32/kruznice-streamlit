@@ -3,7 +3,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from io import BytesIO
 from fpdf import FPDF
+import tempfile
+import os
 
+# --- Nastavení stránky ---
 st.set_page_config(page_title="Kružnice – Body na kružnici", page_icon="⚪", layout="wide")
 
 st.title("⚪ Body na kružnici – webová aplikace")
@@ -48,10 +51,7 @@ for i, (xi, yi) in enumerate(zip(x, y), 1):
 ax.legend()
 st.pyplot(fig)
 
-# --- Export do PDF ---
-import tempfile
-import os
-
+# --- Funkce pro vytvoření PDF ---
 def create_pdf():
     buffer = BytesIO()
     pdf = FPDF()
@@ -80,7 +80,7 @@ def create_pdf():
     pdf.output(buffer)
     return buffer.getvalue()
 
-
+# --- Tlačítko pro stažení PDF ---
 st.download_button(
     label="📄 Stáhnout PDF",
     data=create_pdf(),

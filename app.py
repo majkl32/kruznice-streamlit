@@ -105,14 +105,3 @@ with pdf_button_col2:
 
 st.write("---")
 st.caption("Tip: pro tisk do fyzické tiskárny můžeš stáhnout PDF a použít tisk z prohlížeče nebo použít tisk přímo (Ctrl+P) z rozhraní Streamlit pro tuto stránku.")
-
-st.write("## Další možnosti / nápady")
-st.write(
-    """
-    - Přidat měření délky oblouku mezi dvěma body.\n
-    - Přidat označení indexů bodů přímo v grafu.\n
-    - Export do SVG nebo EPS pro vektorové zpracování.
-    """
-)
-
-

@@ -52,7 +52,7 @@ for i, (xi, yi) in enumerate(zip(x, y), 1):
 ax.legend()
 st.pyplot(fig)
 
-# --- Funkce pro vytvoření PDF s automatickým fontem ---
+# --- Funkce pro vytvoření PDF s fpdf2 ---
 def create_pdf():
     buffer = BytesIO()
     pdf = FPDF()
@@ -66,7 +66,7 @@ def create_pdf():
         with open(font_path, "wb") as f:
             f.write(r.content)
 
-    # Přidání Unicode fontu
+    # Přidání Unicode TrueType fontu
     pdf.add_font("DejaVu", "", font_path, uni=True)
     pdf.set_font("DejaVu", "B", 14)
     pdf.cell(0, 10, "Kružnice – parametry úlohy", ln=True)
@@ -90,7 +90,8 @@ def create_pdf():
     os.remove(tmpfile_path)
 
     pdf.output(buffer)
-    return buffer.getvalue()
+    buffer.seek(0)
+    return buffer
 
 # --- Tlačítko pro stažení PDF ---
 st.download_button(
@@ -106,7 +107,7 @@ with st.expander("ℹ️ Informace o aplikaci"):
     st.write("""
     **Autor aplikace:** *zadej své jméno v levém panelu*  
     **Asistent:** GPT-5  
-    **Použité technologie:** Streamlit, Matplotlib, NumPy, FPDF  
+    **Použité technologie:** Streamlit, Matplotlib, NumPy, FPDF2  
     **Funkce:**  
     - zadání středu, poloměru, počtu bodů, barvy a jednotky  
     - vykreslení kružnice s body  

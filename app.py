@@ -49,6 +49,9 @@ ax.legend()
 st.pyplot(fig)
 
 # --- Export do PDF ---
+import tempfile
+import os
+
 def create_pdf():
     buffer = BytesIO()
     pdf = FPDF()
@@ -63,13 +66,20 @@ def create_pdf():
     pdf.cell(0, 8, f"Autor: {autor}", ln=True)
     pdf.cell(0, 8, f"Kontakt: {kontakt}", ln=True)
 
-    # Ulož graf do obrázku a vlož ho do PDF
-    img_buf = BytesIO()
-    fig.savefig(img_buf, format="png", bbox_inches="tight")
-    img_buf.seek(0)
-    pdf.image(img_buf, x=10, y=80, w=180)
+    # --- Ulož graf do dočasného obrázku ---
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
+        fig.savefig(tmpfile.name, format="png", bbox_inches="tight")
+        tmpfile_path = tmpfile.name
+
+    # --- Vlož do PDF ---
+    pdf.image(tmpfile_path, x=10, y=80, w=180)
+
+    # --- Smaž dočasný soubor ---
+    os.remove(tmpfile_path)
+
     pdf.output(buffer)
     return buffer.getvalue()
+
 
 st.download_button(
     label="📄 Stáhnout PDF",
@@ -90,3 +100,4 @@ with st.expander("ℹ️ Informace o aplikaci"):
     - vykreslení kružnice s body  
     - export výsledku a parametrů do PDF  
     """)
+
